@@ -2,7 +2,7 @@ import os
 import logging
 from pathlib import Path
 from typing import List, Dict, Any
-from faster_whisper import WhisperModel
+from src.core.srt_generator import SRTGenerator
 from tqdm import tqdm
 
 # Basic logging configuration
@@ -35,10 +35,12 @@ class STTEngine:
             self.model_path.mkdir(parents=True, exist_ok=True)
             logger.info(f"Created model directory: {self.model_path}")
 
-    def _load_model(self) -> WhisperModel:
+    def _load_model(self):
         """
         Load the Whisper model. Downloads it if not present.
         """
+        from faster_whisper import WhisperModel
+
         logger.info(f"Loading Whisper model: {self.model_size} on {self.device}...")
         
         try:
@@ -110,8 +112,4 @@ class STTEngine:
         """
         Convert seconds to SRT timestamp format (00:00:00,000).
         """
-        millis = int((seconds - int(seconds)) * 1000)
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        secs = int(seconds % 60)
-        return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+        return SRTGenerator.format_timestamp(seconds)

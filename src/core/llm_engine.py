@@ -2,10 +2,8 @@ import os
 import json
 import logging
 import time
-from pathlib import Path
 from typing import List, Dict, Any, Optional
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from src.utils.resource_resolver import get_resource_path
 
 # Basic logging configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -27,11 +25,9 @@ class LLMEngine:
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         if not self.api_key:
             logger.warning("Gemini API Key not found. Please provide it via init or env var.")
-        else:
-            genai.configure(api_key=self.api_key)
         
-        self.prompt_path = Path(prompt_path)
-        self.glossary_path = Path(glossary_path)
+        self.prompt_path = get_resource_path(prompt_path)
+        self.glossary_path = get_resource_path(glossary_path)
         
         self.base_system_prompt = self._load_prompt()
         self.glossary = self._load_glossary()
@@ -67,6 +63,10 @@ class LLMEngine:
         Returns:
             List of corrected segments.
         """
+        if batch_size < 1:
+            raise ValueError("batch_size must be positive")
+        if not segments:
+            return []
         if not self.api_key:
             logger.error("Gemini API Key not initialized. Skipping correction.")
             return segments
@@ -87,6 +87,9 @@ class LLMEngine:
         }
         
         try:
+            import google.generativeai as genai
+
+            genai.configure(api_key=self.api_key)
             gemini_model = genai.GenerativeModel(
                 model_name=model,
                 generation_config=generation_config,
@@ -154,17 +157,15 @@ class LLMEngine:
 
     def _parse_response(self, response_text: str) -> List[Dict[str, Any]]:
         """Extract and parse JSON from response text."""
-        try:
-            # Find JSON array in response
-            start = response_text.find('[')
-            end = response_text.rfind(']') + 1
-            if start != -1 and end != -1:
-                json_str = response_text[start:end]
-                return json.loads(json_str)
-            else:
-                # If no brackets found, try parsing the whole text (Gemini might return just JSON)
-                return json.loads(response_text)
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON response: {e}")
-            logger.debug(f"Response text: {response_text}")
-            raise
+        start = response_text.find("[")
+        end = response_text.rfind("]")
+        payload = response_text[start:end + 1] if 0 <= start < end else response_text
+        data = json.loads(payload)
+        if not isinstance(data, list) or any(
+            not isinstance(item, dict)
+            or not isinstance(item.get("text"), str)
+            or not item["text"].strip()
+            for item in data
+        ):
+            raise ValueError("Expected an array of objects with non-empty subtitle text")
+        return data

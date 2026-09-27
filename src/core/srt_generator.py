@@ -1,4 +1,4 @@
-import os
+import math
 import logging
 from pathlib import Path
 from datetime import datetime
@@ -22,10 +22,11 @@ class SRTGenerator:
         Returns:
             Formatted timestamp string.
         """
-        millis = int((seconds - int(seconds)) * 1000)
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        secs = int(seconds % 60)
+        if not math.isfinite(seconds) or seconds < 0:
+            raise ValueError("Timestamp must be finite and non-negative")
+        total_seconds, millis = divmod(round(seconds * 1000), 1000)
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, secs = divmod(remainder, 60)
         return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
     @staticmethod
@@ -37,25 +38,21 @@ class SRTGenerator:
             segments: List of segments with 'start', 'end', 'text'.
             output_path: Path to save the SRT file.
         """
-        try:
-            # Ensure output directory exists
-            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(output_path, "w", encoding="utf-8") as f:
-                for i, segment in enumerate(segments, start=1):
-                    start_time = SRTGenerator.format_timestamp(segment["start"])
-                    end_time = SRTGenerator.format_timestamp(segment["end"])
-                    text = segment["text"].strip()
-                    
-                    f.write(f"{i}\n")
-                    f.write(f"{start_time} --> {end_time}\n")
-                    f.write(f"{text}\n\n")
-            
-            logger.info(f"SRT file generated: {output_path}")
-            
-        except Exception as e:
-            logger.error(f"Failed to generate SRT file: {e}")
-            raise
+        blocks = []
+        for i, segment in enumerate(segments, start=1):
+            start_time = SRTGenerator.format_timestamp(segment["start"])
+            end_time = SRTGenerator.format_timestamp(segment["end"])
+            if segment["end"] < segment["start"]:
+                raise ValueError("Subtitle end must not precede its start")
+            text = segment["text"]
+            if not isinstance(text, str) or not text.strip():
+                raise ValueError("Subtitle text must be a non-empty string")
+            blocks.append(f"{i}\n{start_time} --> {end_time}\n{text.strip()}\n\n")
+        # Validate every segment before opening an existing output file.
+        output = Path(output_path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text("".join(blocks), encoding="utf-8")
+        logger.info("SRT file generated: %s", output_path)
 
     @staticmethod
     def generate_output_filename(source_path: str, output_dir: str) -> str:

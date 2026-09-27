@@ -1,0 +1,3 @@
+# Optional CUDA 12 runtime libraries
+nvidia-cudnn-cu12>=9.0.0
+nvidia-cublas-cu12>=12.0.0
