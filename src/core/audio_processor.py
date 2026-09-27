@@ -74,7 +74,7 @@ class AudioProcessor:
             True if valid, False otherwise.
         """
         path = Path(video_path)
-        if not path.exists():
+        if not path.is_file():
             logger.error(f"File not found: {video_path}")
             return False
         

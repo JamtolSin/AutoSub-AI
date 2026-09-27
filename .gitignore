@@ -211,3 +211,8 @@ __marimo__/
 /output/
 /models/
 /logs/
+
+# Superseded local diagnostics / generated output
+/manual_test_*.py
+/gemini_models.txt
+/test_output.txt

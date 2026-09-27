@@ -1,0 +1,4 @@
+# Offline tests: no Whisper model, GPU packages, or Gemini API required.
+pytest>=8.0,<9
+ffmpeg-python>=0.2.0,<0.3
+tqdm>=4.66,<5

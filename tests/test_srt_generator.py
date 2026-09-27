@@ -40,3 +40,27 @@ def test_generate_output_filename(tmp_path):
     filename = SRTGenerator.generate_output_filename(source, str(output_dir))
     assert "movie_" in filename
     assert filename.endswith(".srt")
+
+
+def test_millisecond_rounding_carries_into_next_minute():
+    assert SRTGenerator.format_timestamp(59.9996) == "00:01:00,000"
+
+
+@pytest.mark.parametrize("seconds", [-1, float("nan"), float("inf")])
+def test_invalid_timestamp(seconds):
+    with pytest.raises(ValueError):
+        SRTGenerator.format_timestamp(seconds)
+
+
+@pytest.mark.parametrize("bad_segment", [
+    {"start": 2, "end": 1, "text": "reversed"},
+    {"start": 0, "end": 1, "text": None},
+])
+def test_invalid_later_segment_does_not_truncate_output(tmp_path, bad_segment):
+    output = tmp_path / "existing.srt"
+    output.write_text("keep this", encoding="utf-8")
+    with pytest.raises(ValueError):
+        SRTGenerator.generate_srt(
+            [{"start": 0, "end": 1, "text": "valid"}, bad_segment], str(output)
+        )
+    assert output.read_text(encoding="utf-8") == "keep this"
